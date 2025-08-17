@@ -18,6 +18,14 @@
     ],
     "web": {
       "bundler": "metro"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "b3869c8a-15be-4a61-8442-2bcd1aca70c2"
+      }
+    },
+    "android": {
+      "package": "com.nitish17.assvideoplayer"
     }
   }
 }
