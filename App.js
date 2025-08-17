@@ -132,7 +132,7 @@ const SubtitleRenderer = ({ subtitle, style, screenDimensions }) => {
 
   const baseFontSize = Platform.select({
     ios: screenDimensions.height * 0.022,  // ~2.2% of screen height
-    android: screenDimensions.height * 0.022,
+    android: screenDimensions.height * 0.072,
     default: screenDimensions.height * 0.09
   });
 
@@ -310,7 +310,7 @@ const getVideoStyle = () => {
     else {
       // For web, use a fixed aspect ratio
       videoWidth = screenWidth * 0.5; // 80% of screen width
-      videoHeight = videoWidth*0.39/ videoAspectRatio; // maintain aspect ratio
+      videoHeight = videoWidth*0.4/ videoAspectRatio; // maintain aspect ratio
     }
   return {
     width: videoWidth,
@@ -342,15 +342,14 @@ const getVideoStyle = () => {
         
         {/* Subtitle Overlay */}
         <View style={[styles.subtitleContainer, {
-            width: getVideoStyle().width,
             bottom: Platform.select({
               ios: 40,
-              android: 215,
+              android: 20,
               default: 30
             }),
             paddingHorizontal: Platform.select({
               ios: 20,
-              android: 150,
+              android: 15,
               default: 50
             })
           }]}>
