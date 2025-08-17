@@ -1,5 +1,4 @@
-// App.js
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -10,7 +9,6 @@ import {
   Platform
 } from 'react-native';
 import { Video } from 'expo-av';
-import * as FileSystem from 'expo-file-system';
 import { StatusBar } from 'expo-status-bar';
 
 // ASS Parser Component
@@ -130,21 +128,28 @@ class ASSParser {
 // Subtitle Renderer Component
 const SubtitleRenderer = ({ subtitle, style, screenDimensions }) => {
   const getTextStyle = () => {
-    if (!style) return { color: 'white', fontSize: 16 };
+  if (!style) return { color: 'white', fontSize: 16 };
 
-    return {
-      color: style.primaryColour || 'white',
-      fontSize: style.fontSize || 16,
-      fontWeight: style.bold ? 'bold' : 'normal',
-      fontStyle: style.italic ? 'italic' : 'normal',
-      textDecorationLine: style.underline ? 'underline' : 'none',
-      textShadowColor: style.outlineColour || 'black',
-      textShadowOffset: { width: 1, height: 1 },
-      textShadowRadius: style.outline || 1,
-      marginLeft: style.marginL || 0,
-      marginRight: style.marginR || 0,
-    };
+  const baseFontSize = Platform.select({
+    ios: screenDimensions.height * 0.022,  // ~2.2% of screen height
+    android: screenDimensions.height * 0.022,
+    default: screenDimensions.height * 0.09
+  });
+
+  return {
+    color: style.primaryColour || 'white',
+    fontSize: style.fontSize ? baseFontSize * (style.fontSize / 160) : baseFontSize,
+    fontWeight: style.bold ? 'bold' : 'normal',
+    fontStyle: style.italic ? 'italic' : 'normal',
+    textDecorationLine: style.underline ? 'underline' : 'none',
+    textShadowColor: style.outlineColour || 'black',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: style.outline || 1,
+    marginHorizontal: 10,
+    textAlign: 'center',
   };
+};
+
 
   const getPositionStyle = () => {
     if (!style) return {};
@@ -187,13 +192,16 @@ const SubtitleRenderer = ({ subtitle, style, screenDimensions }) => {
 
 // Main Video Player Component
 export default function App() {
-  const [video, setVideo] = useState(null);
+  // const [video, setVideo] = useState(null);
   const [status, setStatus] = useState({});
   const [subtitles, setSubtitles] = useState([]);
   const [assParser, setAssParser] = useState(null);
   const [screenData, setScreenData] = useState(Dimensions.get('window'));
+  const [videoDimensions, setVideoDimensions] = useState({ width: 9, height: 16 }); // default portrait ratio
+
   const videoRef = useRef(null);
 
+  // Sample video and subtitle URLs (replace with your Google Drive links)
   const VIDEO_URL = 'https://juxwcxgddeihfinsxxlz.supabase.co/storage/v1/object/public/ig/video.mp4';
   const SUBTITLE_URL = 'https://juxwcxgddeihfinsxxlz.supabase.co/storage/v1/object/public/ig/subtitles.ass'; 
 
@@ -233,10 +241,6 @@ export default function App() {
     } catch (error) {
       console.error('Error loading subtitles:', error);
       Alert.alert('Error', `Failed to load subtitles: ${error.message}`);
-      
-      // Optional: You can still create a fallback parser with empty content
-      // const fallbackParser = new ASSParser('');
-      // setAssParser(fallbackParser);
     }
   };
 
@@ -281,6 +285,39 @@ export default function App() {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
+  // Calculate responsive video dimensions
+// Updated getVideoStyle function for better mobile display
+const getVideoStyle = () => {
+  const { width: screenWidth, height: screenHeight } = screenData;
+  const isMobile = Platform.OS !== 'web';
+
+  const videoAspectRatio = videoDimensions.width / videoDimensions.height;
+  const screenAspectRatio = screenWidth / screenHeight;
+
+  let videoWidth, videoHeight;
+  if (isMobile) {
+
+      if (videoAspectRatio > screenAspectRatio) {
+        // Video is wider than screen
+        videoWidth = screenWidth;
+        videoHeight = screenWidth / videoAspectRatio;
+      } else {
+        // Video is taller than screen
+        videoHeight = screenHeight * 0.85; // reserve some space for controls
+        videoWidth = videoHeight * videoAspectRatio;
+      }
+    }
+    else {
+      // For web, use a fixed aspect ratio
+      videoWidth = screenWidth * 0.5; // 80% of screen width
+      videoHeight = videoWidth*0.39/ videoAspectRatio; // maintain aspect ratio
+    }
+  return {
+    width: videoWidth,
+    height: videoHeight,
+  };
+};
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
@@ -289,20 +326,34 @@ export default function App() {
       <View style={styles.videoContainer}>
         <Video
           ref={videoRef}
-          style={[styles.video, { 
-            width: screenData.width, 
-            height: screenData.width * (9/16) // 16:9 aspect ratio
-          }]}
+          style={[styles.video, getVideoStyle()]}
           source={{ uri: VIDEO_URL }}
           useNativeControls={false}
           resizeMode="contain"
           isLooping={false}
           onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
           shouldPlay={false}
+          onLoad={({ naturalSize }) => {
+            if (naturalSize?.width && naturalSize?.height) {
+              setVideoDimensions(naturalSize);
+            }
+          }}
         />
         
         {/* Subtitle Overlay */}
-        <View style={styles.subtitleContainer}>
+        <View style={[styles.subtitleContainer, {
+            width: getVideoStyle().width,
+            bottom: Platform.select({
+              ios: 40,
+              android: 215,
+              default: 30
+            }),
+            paddingHorizontal: Platform.select({
+              ios: 20,
+              android: 150,
+              default: 50
+            })
+          }]}>
           {subtitles.map((subtitle, index) => (
             <SubtitleRenderer
               key={`${subtitle.start}-${index}`}
@@ -351,13 +402,13 @@ export default function App() {
       {/* Debug Info */}
       <View style={styles.debugContainer}>
         <Text style={styles.debugText}>
-          Active Subtitles: {subtitles.length}
+          Platform: {Platform.OS} | Screen: {Math.round(screenData.width)}x{Math.round(screenData.height)}
+        </Text>
+        <Text style={styles.debugText}>
+          Video: {Math.round(getVideoStyle().width)}x{Math.round(getVideoStyle().height)} | Subtitles: {subtitles.length}
         </Text>
         <Text style={styles.debugText}>
           Total Events: {assParser ? assParser.events.length : 0}
-        </Text>
-        <Text style={styles.debugText}>
-          Platform: {Platform.OS}
         </Text>
       </View>
     </View>
@@ -373,6 +424,10 @@ const styles = StyleSheet.create({
   videoContainer: {
     position: 'relative',
     alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+    backgroundColor: '#000',
+    overflow: 'visible',
   },
   video: {
     backgroundColor: '#000',
@@ -380,10 +435,10 @@ const styles = StyleSheet.create({
   subtitleContainer: {
     position: 'absolute',
     bottom: 20,
-    left: 20,
-    right: 20,
+    width: '100%',
     alignItems: 'center',
-    zIndex: 1,
+    zIndex: 10,
+    paddingHorizontal: 16,
   },
   controlsContainer: {
     padding: 20,
@@ -430,7 +485,8 @@ const styles = StyleSheet.create({
   },
   debugText: {
     color: '#ccc',
-    fontSize: 12,
+    fontSize: 11,
     textAlign: 'center',
+    marginVertical: 1,
   },
 });
