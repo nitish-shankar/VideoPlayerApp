@@ -350,7 +350,7 @@ const getVideoStyle = () => {
             paddingHorizontal: Platform.select({
               ios: 20,
               android: 15,
-              default: 50
+              default: 400
             })
           }]}>
           {subtitles.map((subtitle, index) => (
